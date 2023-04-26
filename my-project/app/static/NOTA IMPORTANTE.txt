@@ -1,1 +1,3 @@
 AQUI PEGAR EL DIRECTORIO STATIC DEL REPOSITORIO DE SWAGGER
+
+git clone https://github.com/omondragon/swagger-example
