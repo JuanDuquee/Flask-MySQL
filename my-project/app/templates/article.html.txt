@@ -1,0 +1,13 @@
+<!-- articles.html -->
+{% extends "base.html" %}
+{% block title %}Articles{% endblock %}
+{% block body %}
+<h1>Artículo</h1>
+                <div class="card" style="width: 18rem;">
+                        <div class="card-body">
+                                <h1>{{article}}</h5>
+                                <h5>Este es el ID del articulo</h6>
+                                <a href="/articles" class="card-link">Volver</a>
+                        </div>
+                </div>
+{% endblock %}

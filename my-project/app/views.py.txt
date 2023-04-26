@@ -1,0 +1,257 @@
+#app/views.py
+
+from flask import render_template, flash, redirect, url_for, session, request, logging
+from flask_mysqldb import MySQL
+from wtforms import Form, StringField, TextAreaField, PasswordField, validators
+from passlib.hash import sha256_crypt
+from functools import wraps
+
+from app import app
+from app import data
+
+from apispec import APISpec
+from apispec.ext.marshmallow import MarshmallowPlugin
+from apispec_webframeworks.flask import FlaskPlugin
+from flask import Flask,jsonify,send_from_directory
+from marshmallow import Schema, fields
+from datetime import date
+
+spec = APISpec(
+    title='Flask-api-swagger-doc',
+    version='1.0.0.',
+    openapi_version='3.0.2',
+    plugins=[FlaskPlugin(),MarshmallowPlugin()]
+)
+
+app.secret_key='secrect123'
+
+# Config MySQL
+app.config['MYSQL_HOST'] = 'localhost'
+app.config['MYSQL_USER'] = 'root'
+app.config['MYSQL_PASSWORD'] = ''
+app.config['MYSQL_DB'] = 'myflaskapp'
+app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
+
+#INIT MYSQL
+mysql = MySQL(app)
+
+class RegisterForm(Form):
+    name = StringField('Name', [validators.Length(min=1, max=50)])
+    username = StringField ('Username', [validators.Length(min=4, max=25)])
+    email = StringField('Email', [validators.Length(min=6, max=50)])
+    password = PasswordField('Password', [
+        validators.DataRequired(),
+        validators.EqualTo('confirm', message='Password do not match')
+        ])
+    confirm = PasswordField ('Confirm Password')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    form = RegisterForm(request.form)
+    if request.method == 'POST' and form.validate():
+        name = form.name.data
+        email = form.email.data
+        username = form.username.data
+        password = sha256_crypt.encrypt(str(form.password.data))
+
+        # Create Cursor
+        cur = mysql.connection.cursor()
+
+        #Execute Query
+        cur.execute("INSERT INTO users (name, email, username, password) VALUES (%s, %s, %s, %s)", (name, email, username, password))
+
+        # Commit to DB
+        mysql.connection.commit()
+
+        # Close connection
+        cur.close()
+
+        flash('You are now registered and can log in', 'success')
+
+        return redirect(url_for('index'))
+
+    return render_template('register.html', form=form)
+
+# User Login
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+
+        # Get Form Fields
+        username= request.form['username']
+        password_candidate= request.form['password']
+
+        # Create cursor
+        cur = mysql.connection.cursor()
+
+        # Get user by username
+        result = cur.execute("SELECT * FROM users WHERE username=%s", [username])
+
+        if result> 0:
+
+            # Get stored hash
+            data = cur.fetchone()
+            password = data['password']
+
+            # Compare Passwords
+            if sha256_crypt.verify(password_candidate, password):
+                # Passed
+                session['logged_in'] = True
+                session ['username'] = username
+                flash('You are logged in', 'success')
+                app.logger.info('PASSWORD MATCHED')
+                return redirect(url_for('dashboard'))
+            else:
+                app.logger.info('PASSWORD NO MATCHED')
+                error = 'Invalid login'
+                return render_template('login.html', error=error)
+
+            # Close connection
+            cur.close()
+
+        else:
+            app.logger.info('NO USER')
+            error = 'Username not found'
+            return render_template('login.html', error=error)
+
+    return render_template('login.html')
+
+# Check if user logged in
+def is_logged_in(f):
+    @wraps(f)
+    def wrap(*args, **kwargs):
+        if 'logged_in' in session:
+            return f(*args, **kwargs)
+        else:
+            flash('Unauthorized, Plese login', 'danger')
+            return redirect(url_for('login'))
+    return wrap
+
+# Dashboard
+@app.route('/dashboard', methods=['GET', 'POST'])
+@is_logged_in
+def dashboard():
+    if request.method == 'GET':
+        cur = mysql.connection.cursor()
+        cur.execute("SELECT * FROM articulos")
+        articulos = cur.fetchall()
+        cur.close()
+    return render_template('dashboard.html', articulos=articulos)
+
+# Vista para agregar un nuevo artículo
+@app.route('/add_article', methods=['GET', 'POST'])
+@is_logged_in
+def agregar_articulo():
+    if request.method == 'POST':
+        id = request.form['id']
+        title = request.form['title']
+        author = request.form['author']
+        create_date = request.form['create_date']
+        cur = mysql.connection.cursor()
+        cur.execute("INSERT INTO articulos (id, title, author, create_date) VALUES (%s, %s, %s, %s)",
+                    (id, title, author, create_date))
+        mysql.connection.commit()
+        cur.close()
+
+        return redirect('/dashboard')
+    return render_template('add_article.html')
+
+# Vista para editar un artículo existente
+@app.route('/edit_article/<int:id>', methods=['GET', 'POST'])
+@is_logged_in
+def editar_articulo(id):
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT * FROM articulos WHERE id = %s", (id,))
+    articulo = cur.fetchone()
+    cur.close()
+
+    if request.method == 'POST':
+        #id = request.form['id']
+        title = request.form['title']
+        author = request.form['author']
+        create_date = request.form['create_date']
+
+        cur = mysql.connection.cursor()
+        cur.execute("UPDATE articulos SET title = %s, author = %s, create_date = %s WHERE id = %s",
+                    (title, author, create_date, id))
+        mysql.connection.commit()
+        cur.close()
+
+        return redirect('/dashboard')
+    return render_template('edit_article.html', articulo=articulo)
+
+# Vista para eliminar un artículo
+@app.route('/delete_article/<int:id>', methods=['POST'])
+def eliminar_articulo(id):
+    cur = mysql.connection.cursor()
+    cur.execute("DELETE FROM articulos WHERE id = %s", (id,))
+    mysql.connection.commit()
+    cur.close()
+
+    return redirect('/dashboard')
+
+# Logout
+@app.route('/logout')
+def logout():
+    session.clear()
+    flash('You are now logged out', 'success')
+    return redirect(url_for('login'))
+
+@app.route('/')
+def index():
+        return render_template("index.html")
+
+@app.route('/about')
+def about():
+        return render_template("about.html")
+
+@app.route('/articles')
+def articulos():
+    resultado = data.articles()
+    return render_template("articles.html", resultado = resultado)
+
+@app.route('/article/<article>')
+def prueba(article):
+    return render_template("article.html", article = article)
+
+@app.route('/api/swagger.json')
+def create_swagger_spec():
+            return jsonify(spec.to_dict())
+
+class ArticleResponseSchema(Schema):
+    id = fields.Int()
+    title = fields.Str()
+    body = fields.Str()
+    author = fields.Str()
+    create_date = fields.Str()
+
+class ArticleListResponseSchema(Schema):
+    article_list = fields.List(fields.Nested(ArticleResponseSchema))
+
+@app.route('/prueba')
+def article():
+    """Get List of Articles
+        ---
+        get:
+            description: Get List of Articles
+            responses:
+                200:
+                    description: Return an article list
+                    content:
+                        application/json:
+                            schema: ArticleListResponseSchema
+    """
+    resultado = data.articles()
+
+    return ArticleListResponseSchema().dump({'article_list':resultado})
+
+with app.test_request_context():
+        spec.path(view=article)
+
+@app.route('/docs')
+@app.route('/docs/<path:path>')
+def swagger_docs(path=None):
+    if not path or path == 'docs.html':
+        return render_template('docs.html',base_url='/docs')
+    else:
+        return send_from_directory('static',path)

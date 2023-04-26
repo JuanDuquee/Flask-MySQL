@@ -1,0 +1,9 @@
+<!-- about.html -->
+{% extends "base.html" %}
+{% block tittle %}About{% endblock %}
+{% block body %}
+<div class="jumbotron">
+    <h1>About</h1>
+    <p class="lead">Lorem ipsum dolor, sit amet consectetur adipisicing elit. Illo, officia?.</p>
+</div>
+{% endblock %}

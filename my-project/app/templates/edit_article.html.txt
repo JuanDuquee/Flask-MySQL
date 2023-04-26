@@ -1,0 +1,27 @@
+<!--edit_article.html-->
+{% extends "base.html" %}
+{% block title %} Edit Article{% endblock %}
+{% block body %}
+<h1>Edit Article</h1>
+<form method="post" action="/edit_article/{{articulo['id']}}">
+    <div class="form-group">
+    <label for="id">ID</label>
+    <input class="form-control" type="number" name="id" id="id" value="{{articulo['id']}}" disabled>
+    </div>
+    <div class="form-group">
+    <label for="titulo">Título</label>
+    <input class="form-control" type="text" name="title" id="title" value="{{articulo['title']}}" required>
+    </div>
+    <div class="form-group">
+    <label for="autor">Autor</label>
+    <input class="form-control" type="text" name="author" id="author" value="{{articulo['author']}}" required>
+    </div>
+    <div class="form-group">
+    <label for="fecha">Fecha</label>
+    <input class="form-control" type="date" name="create_date" id="create_date" value="{{articulo['create_date']}}" required>
+    </div>
+    <input style="margin:10px 20px 10px 0;" class="btn btn-success" type="submit" value="Editar">
+    <a class="btn btn-warning" href="/dashboard">Volver</a>
+</form>
+<br>
+{% endblock %}

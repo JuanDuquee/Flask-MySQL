@@ -1,0 +1,14 @@
+<!-- articles.html -->
+{% extends "base.html" %}
+{% block title %}Articles{% endblock %}
+{% block body %}
+<h1>Artículos</h1>
+                <div class="list-group">
+                        {% for article in resultado %}
+                        <a href="article/{{article.id}}" class="list-group-item list-group-item-action">{{ article.title }}</a>
+                        {% endfor %}
+                </div>
+                <div class="list-group">
+                        <a href="/docs" class="list-group-item list-group-item-action">documentacion</a>                                                                                                         
+                </div>
+{% endblock %}
